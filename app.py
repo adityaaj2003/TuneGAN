@@ -1,96 +1,123 @@
-from audiocraft.models import MusicGen
-import streamlit as st 
-import torch 
-import torchaudio
-import os 
-import numpy as np
+import os
 import base64
+from pathlib import Path
 
-@st.cache_resource
-def load_model():
-    model = MusicGen.get_pretrained('facebook/musicgen-small')
-    return model
-
-def generate_music_tensors(description, duration: int):
-    print("Description: ", description)
-    print("Duration: ", duration)
-    model = load_model()
-
-    model.set_generation_params(
-        use_sampling=True,
-        top_k=250,
-        duration=duration
-    )
-
-    output = model.generate(
-        descriptions=[description],
-        progress=True,
-        return_tokens=True
-    )
-
-    return output[0]
+import torch
+import torchaudio
+import streamlit as st
+from audiocraft.models import MusicGen
 
 
-def save_audio(samples: torch.Tensor):
-    """Renders an audio player for the given audio samples and saves them to a local directory.
-
-    Args:
-        samples (torch.Tensor): a Tensor of decoded audio samples
-            with shapes [B, C, T] or [C, T]
-        sample_rate (int): sample rate audio should be displayed with.
-        save_path (str): path to the directory where audio should be saved.
-    """
-
-    print("Samples (inside function): ", samples)
-    sample_rate = 32000
-    save_path = "audio_output/"
-    assert samples.dim() == 2 or samples.dim() == 3
-
-    samples = samples.detach().cpu()
-    if samples.dim() == 2:
-        samples = samples[None, ...]
-
-    for idx, audio in enumerate(samples):
-        audio_path = os.path.join(save_path, f"audio_{idx}.wav")
-        torchaudio.save(audio_path, audio, sample_rate)
-
-def get_binary_file_downloader_html(bin_file, file_label='File'):
-    with open(bin_file, 'rb') as f:
-        data = f.read()
-    bin_str = base64.b64encode(data).decode()
-    href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'
-    return href
-
+###############################################################################
+# ------------------------------  PAGE CONFIG  ------------------------------ #
+###############################################################################
 st.set_page_config(
-    page_icon= "musical_note",
-    page_title= "Music Gen"
+    page_title="TuneGAN · Text‑to‑Music",
+    page_icon="🎵",
+    layout="centered",
+    initial_sidebar_state="expanded",
 )
 
-def main():
+# Custom CSS (Google font, card shadows, primary color)
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
 
-    st.title("TuneGAN🎵")
+    html, body, [class*="css"]  {
+        font-family: 'Poppins', sans-serif;
+    }
+
+    /* Streamlit primary color override */
+    :root {
+        --primary-base: #6366f1;   /* indigo‑500 */
+        --secondary-background-color: rgba(99, 102, 241, 0.08);
+    }
+
+    /* Fancy card */
+    .st-audio-card {
+        background: var(--secondary-background-color);
+        padding: 1.2rem 1rem 1.4rem;
+        border-radius: 1rem;
+        box-shadow: 0 10px 18px rgba(0,0,0,0.15);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+###############################################################################
+# ------------------------------  HELPERS  ---------------------------------- #
+###############################################################################
+AUDIO_DIR = Path("audio_output")
+AUDIO_DIR.mkdir(exist_ok=True)
+
+@st.cache_resource(show_spinner=False)
+def load_model():
+    return MusicGen.get_pretrained("facebook/musicgen-small")
+
+def generate_music(description: str, duration: int) -> torch.Tensor:
+    model = load_model()
+    model.set_generation_params(use_sampling=True, top_k=250, duration=duration)
+    # single‑element list -> tensor [C, T]
+    return model.generate([description], progress=True)[0]
+
+def save_waveform(wave: torch.Tensor, idx: int = 0, sr: int = 32_000) -> Path:
+    path = AUDIO_DIR / f"audio_{idx}.wav"
+    torchaudio.save(str(path), wave.detach().cpu(), sr)
+    return path
+
+def download_link(file_path: Path, label: str = "Download") -> str:
+    data = file_path.read_bytes()
+    b64 = base64.b64encode(data).decode()
+    return f"""
+        <a href="data:audio/wav;base64,{b64}" download="{file_path.name}">
+            {label} ⬇
+        </a>
+    """
+
+###############################################################################
+# ------------------------------  SIDEBAR  ---------------------------------- #
+###############################################################################
+st.sidebar.header("🛠️  Controls")
+
+description = st.sidebar.text_area(
+    "Enter a musical prompt",
+    placeholder="e.g. 'Lo‑fi chill beats with vinyl crackle and soft piano'",
+    height=120,
+)
+
+duration = st.sidebar.slider("Duration (seconds)", 1, 30, 10, step=1)
+generate_btn = st.sidebar.button("🎼  Generate Music", type="primary", use_container_width=True)
+
+st.sidebar.markdown("---")
 
 
-    text_area = st.text_area("Enter your description.......")
-    time_slider = st.slider("Select time duration (In Seconds)", 0, 20, 10)
+###############################################################################
+# ------------------------------  MAIN AREA  -------------------------------- #
+###############################################################################
+st.title("TuneGAN 🎵")
+st.caption("Turn a short text prompt into royalty‑free music in seconds.")
 
-    if text_area and time_slider:
-        st.json({
-            'Your Description': text_area,
-            'Selected Time Duration (in Seconds)': time_slider
-        })
+if generate_btn:
+    if not description.strip():
+        st.warning("Please enter a prompt first. 💬")
+        st.stop()
 
-        st.subheader("Generated Music")
-        music_tensors = generate_music_tensors(text_area, time_slider)
-        print("Musci Tensors: ", music_tensors)
-        save_music_file = save_audio(music_tensors)
-        audio_filepath = 'audio_output/audio_0.wav'
-        audio_file = open(audio_filepath, 'rb')
-        audio_bytes = audio_file.read()
-        st.audio(audio_bytes)
-        st.markdown(get_binary_file_downloader_html(audio_filepath, 'Audio'), unsafe_allow_html=True)
+    with st.spinner("🎙️  Composing… this may take ~10 s"):
+        waveform = generate_music(description, duration)
+        file_path = save_waveform(waveform)
 
+    # ---- Result card ------------------------------------------------------ #
+    with st.container():
+        st.markdown('<div class="st-audio-card">', unsafe_allow_html=True)
+        st.subheader("Your Track")
+        with st.expander("▶️  Listen / Download", expanded=True):
+            st.audio(file_path.read_bytes(), format="audio/wav")
+            st.markdown(download_link(file_path, "Save .wav"), unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-if __name__ == "__main__":
-    main()
-    
+    st.success("Done! Enjoy your music. 🎧")
+
+else:
+    st.info("Enter a prompt in the sidebar and hit **Generate Music** to begin.")
