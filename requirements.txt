@@ -1,12 +1,12 @@
-# requirements.txt  (Python 3.12)
+# requirements.txt
 streamlit==1.33.0
 
 torch==2.2.2
-torchaudio==2.2.2
+torchaudio==2.2.2          # must match torch
 
-# pull latest Audiocraft directly from GitHub
+# pull Audiocraft directly from GitHub *instead* of PyPI
 git+https://github.com/facebookresearch/audiocraft.git@main
 
 transformers==4.39.3
 sentencepiece==0.1.99
-accelerate==0.28.0
+accelerate==0.28.0          # ok with ≥1.10 torch
