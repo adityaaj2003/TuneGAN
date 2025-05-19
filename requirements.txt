@@ -1,4 +1,13 @@
-torch
-torchaudio
-streamlit
-audiocraft
+# Core libraries
+torch==2.2.2      # or the latest version that matches the Python runtime
+torchaudio==2.2.2
+transformers>=4.38
+sentencepiece      # MusicGen dependency
+
+# Streamlit
+streamlit>=1.33
+
+# Meta Audiocraft (MusicGen)
+audiocraft==1.2.0
+
+# Any others you use
