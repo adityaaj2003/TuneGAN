@@ -1,14 +1,12 @@
-# Streamlit
+# requirements.txt  ── tested on Streamlit Cloud (CPU)
 streamlit==1.33.0
 
-# PyTorch CPU wheels
-torch==2.2.2
-torchaudio==2.2.2
+torch==2.1.2
+torchaudio==2.1.2        # must match torch
+audiocraft==1.2.0
 
-# Transformers stack
 transformers==4.39.3
 sentencepiece==0.1.99
-accelerate==0.28.0   # good to have
+accelerate==0.28.0
 
-# MusicGen
-audiocraft==1.2.0
+# (rest unchanged)
