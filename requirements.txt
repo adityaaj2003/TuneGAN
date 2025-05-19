@@ -1,13 +1,14 @@
-# Core libraries
-torch==2.2.2      # or the latest version that matches the Python runtime
-torchaudio==2.2.2
-transformers>=4.38
-sentencepiece      # MusicGen dependency
-
 # Streamlit
-streamlit>=1.33
+streamlit==1.33.0
 
-# Meta Audiocraft (MusicGen)
+# PyTorch CPU wheels
+torch==2.2.2
+torchaudio==2.2.2
+
+# Transformers stack
+transformers==4.39.3
+sentencepiece==0.1.99
+accelerate==0.28.0   # good to have
+
+# MusicGen
 audiocraft==1.2.0
-
-# Any others you use
