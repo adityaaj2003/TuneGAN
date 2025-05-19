@@ -7,7 +7,6 @@ import torchaudio
 import streamlit as st
 from audiocraft.models import MusicGen
 
-
 ###############################################################################
 # ------------------------------  PAGE CONFIG  ------------------------------ #
 ###############################################################################
@@ -41,6 +40,21 @@ st.markdown(
         border-radius: 1rem;
         box-shadow: 0 10px 18px rgba(0,0,0,0.15);
     }
+
+    /* Developer badge */
+    .dev-badge {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--primary-base);
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        margin-top: 1.5rem;
+    }
+    .dev-badge svg {
+        width: 18px;
+        height: 18px;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -71,53 +85,109 @@ def download_link(file_path: Path, label: str = "Download") -> str:
     data = file_path.read_bytes()
     b64 = base64.b64encode(data).decode()
     return f"""
-        <a href="data:audio/wav;base64,{b64}" download="{file_path.name}">
-            {label} ⬇
-        </a>
+        <a href=\"data:audio/wav;base64,{b64}\" download=\"{file_path.name}\">{label} ⬇</a>
     """
 
 ###############################################################################
 # ------------------------------  SIDEBAR  ---------------------------------- #
 ###############################################################################
-st.sidebar.header("🛠️  Controls")
+page = st.sidebar.radio("Navigate", ["🎹 Generate", "ℹ️ About"], label_visibility="collapsed")
 
-description = st.sidebar.text_area(
-    "Enter a musical prompt",
-    placeholder="e.g. 'Lo‑fi chill beats with vinyl crackle and soft piano'",
-    height=120,
-)
-
-duration = st.sidebar.slider("Duration (seconds)", 1, 30, 10, step=1)
-generate_btn = st.sidebar.button("🎼  Generate Music", type="primary", use_container_width=True)
-
+# -- Developer badge in sidebar
 st.sidebar.markdown("---")
-
+st.sidebar.markdown(
+    """
+    <div class="dev-badge">
+        <svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M13 16h-1v-4h-1m-1 4H9m4-2h1m1 0h1m1 0h1m-5 5H7a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h6a2 2 0 012 2v4' /></svg>
+        Developed by <span>Aditya Anand Joshi</span>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 ###############################################################################
 # ------------------------------  MAIN AREA  -------------------------------- #
 ###############################################################################
-st.title("TuneGAN 🎵")
-st.caption("Turn a short text prompt into royalty‑free music in seconds.")
+if page == "🎹 Generate":
+    st.title("TuneGAN 🎵")
+    st.caption("Turn a short text prompt into royalty‑free music in seconds.")
 
-if generate_btn:
-    if not description.strip():
-        st.warning("Please enter a prompt first. 💬")
-        st.stop()
+    description = st.text_area(
+        "Enter a musical prompt",
+        placeholder="e.g. 'Lo‑fi chill beats with vinyl crackle and soft piano'",
+        height=120,
+    )
+    col1, col2 = st.columns([1,3])
+    with col1:
+        duration = st.number_input("Duration (s)", 1, 30, 10)
+    with col2:
+        generate_btn = st.button("🎼  Generate Music", type="primary")
 
-    with st.spinner("🎙️  Composing… this may take ~10 s"):
-        waveform = generate_music(description, duration)
-        file_path = save_waveform(waveform)
+    if generate_btn:
+        if not description.strip():
+            st.warning("Please enter a prompt first. 💬")
+            st.stop()
 
-    # ---- Result card ------------------------------------------------------ #
-    with st.container():
-        st.markdown('<div class="st-audio-card">', unsafe_allow_html=True)
-        st.subheader("Your Track")
-        with st.expander("▶️  Listen / Download", expanded=True):
-            st.audio(file_path.read_bytes(), format="audio/wav")
-            st.markdown(download_link(file_path, "Save .wav"), unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+        with st.spinner("🎙️  Composing… this may take ~10 s"):
+            waveform = generate_music(description, duration)
+            file_path = save_waveform(waveform)
 
-    st.success("Done! Enjoy your music. 🎧")
+        # ---- Result card ------------------------------------------------------ #
+        with st.container():
+            st.markdown('<div class="st-audio-card">', unsafe_allow_html=True)
+            st.subheader("Your Track")
+            with st.expander("▶️  Listen / Download", expanded=True):
+                st.audio(file_path.read_bytes(), format="audio/wav")
+                st.markdown(download_link(file_path, "Save .wav"), unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
+        st.success("Done! Enjoy your music. 🎧")
+
+    else:
+        st.info("Enter a prompt and hit **Generate Music** to begin.")
+
+# ----------------------------- ABOUT PAGE ---------------------------------- #
 else:
-    st.info("Enter a prompt in the sidebar and hit **Generate Music** to begin.")
+    st.title("About TuneGAN")
+    st.write(
+        """
+        **TuneGAN** is a lightweight text‑to‑music generator.  
+
+        **How it works:**  
+
+        1. You provide a short natural‑language prompt describing the style, instruments, or mood you want.  
+        2. The prompt is tokenised and passed to the pretrained MusicGen model with GAN.  
+        3. The model autoregressively generates a multitrack audio waveform at 32 kHz.  
+        4. The waveform is returned to Streamlit, saved as **.wav**, and streamed back to you.  
+
+        Generation runs entirely on‑device/server—no external API calls—so your prompts never leave the host machine.
+        """
+    )
+
+    st.markdown("---")
+    st.subheader("📋 Coordinator")
+    colC1, colC2 = st.columns([1,3])
+    with colC1:
+        st.image("https://avatars.githubusercontent.com/u/11537016?v=4", width=110)
+    with colC2:
+        st.markdown("**Prof. Anand Vaidya**  \n" \
+        "Project coordinator and academic mentor.")
+    st.markdown("---")
+    st.subheader("👥  Developers")
+
+    devs = [
+        {"name": "Aditya Anand Joshi", "img": "https://avatars.githubusercontent.com/u/11537016?v=4", "bio": "Final‑year B.E. Computer Science, SDM College of Engineering & Technology, Dharwad"},
+        {"name": "Kirankumar Devarakondi", "img": "https://avatars.githubusercontent.com/u/11537016?v=4", "bio": "Final‑year B.E. Computer Science, SDM College of Engineering & Technology, Dharwad"},
+        {"name": "Vallabh Nayamgoud", "img": "https://avatars.githubusercontent.com/u/11537016?v=4", "bio": "Final‑year B.E. Computer Science, SDM College of Engineering & Technology, Dharwad"},
+        {"name": "Varun Sultanpur", "img": "https://avatars.githubusercontent.com/u/11537016?v=4", "bio": "Final‑year B.E. Computer Science, SDM College of Engineering & Technology, Dharwad"},
+    ]
+
+    for d in devs:
+        colA, colB = st.columns([1,3])
+        with colA:
+            st.image(d["img"], width=110)
+        with colB:
+            st.markdown(f"**{d['name']}**  \n{d['bio']}")
+        st.markdown("---")
+
+    st.caption("© 2025 TuneGAN Team – All rights reserved.")
